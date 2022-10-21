@@ -73,8 +73,7 @@ function getFix(first, rest, sourceCode) {
 
       return {
         importNode: node,
-        text: sourceCode.text.slice(openBrace.range[1], closeBrace.range[0]),
-        hasTrailingComma: isPunctuator(sourceCode.getTokenBefore(closeBrace), ','),
+        identifiers: sourceCode.text.slice(openBrace.range[1], closeBrace.range[0]).split(','), // Split the text into separate identifiers (retaining any whitespace before or after)
         isEmpty: !hasSpecifiers(node),
       };
     })
@@ -105,17 +104,32 @@ function getFix(first, rest, sourceCode) {
       closeBrace != null &&
       isPunctuator(sourceCode.getTokenBefore(closeBrace), ',');
     const firstIsEmpty = !hasSpecifiers(first);
+    const firstExistingIdentifiers = firstIsEmpty
+      ? new Set()
+      : sourceCode.text.slice(openBrace.range[1], closeBrace.range[0])
+        .split(',')
+        .reduce((acc, cur) => acc.add(cur.trim()), new Set());
 
     const [specifiersText] = specifiers.reduce(
-      ([result, needsComma], specifier) => {
+      ([result, needsComma, existingIdentifiers], specifier) => {
+        // Add *only* the new identifiers that don't already exist, and track any new identifiers so we don't add them again in the next loop
+        const [specifierText, updatedExistingIdentifiers] = specifier.identifiers.reduce(([text, set], cur) => {
+          const trimmed = cur.trim(); // Trim whitespace before/after to compare to our set of existing identifiers
+          if (existingIdentifiers.has(cur.trim())) {
+            return [text, set];
+          }
+          return [text.length > 0 ? `${text},${cur}` : cur, set.add(trimmed)];
+        }, ['', existingIdentifiers]);
+
         return [
           needsComma && !specifier.isEmpty
-            ? `${result},${specifier.text}`
-            : `${result}${specifier.text}`,
+            ? `${result},${specifierText}`
+            : `${result}${specifierText}`,
           specifier.isEmpty ? needsComma : true,
+          updatedExistingIdentifiers,
         ];
       },
-      ['', !firstHasTrailingComma && !firstIsEmpty],
+      ['', !firstHasTrailingComma && !firstIsEmpty, firstExistingIdentifiers],
     );
 
     const fixes = [];

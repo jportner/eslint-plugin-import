@@ -129,6 +129,20 @@ ruleTester.run('no-duplicates', rule, {
       errors: ['\'./foo\' imported multiple times.', '\'./foo\' imported multiple times.'],
     }),
 
+    // #2347: duplicate identifiers should be removed
+    test({
+      code: "import {a} from './foo'; import { a } from './foo'",
+      output: "import {a} from './foo'; ",
+      errors: ['\'./foo\' imported multiple times.', '\'./foo\' imported multiple times.'],
+    }),
+
+    // #2347: duplicate identifiers should be removed
+    test({
+      code: "import {a,b} from './foo'; import { b, c } from './foo'; import {b,c,d} from './foo'",
+      output: "import {a,b, c,d} from './foo';  ",
+      errors: ['\'./foo\' imported multiple times.', '\'./foo\' imported multiple times.', '\'./foo\' imported multiple times.'],
+    }),
+
     test({
       code: "import {x} from './foo'; import {} from './foo'; import {/*c*/} from './foo'; import {y} from './foo'",
       output: "import {x/*c*/,y} from './foo';   ",
